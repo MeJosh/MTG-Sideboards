@@ -1,16 +1,41 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { cardIdentity, type Card } from "../types";
 
-defineProps<{
+const props = defineProps<{
   title: string;
   cards: Card[];
   total: number;
   disabled: boolean;
+  gregMode: boolean;
   movedKeys?: string[];
   movedClass?: string;
 }>();
 
 defineEmits<{ move: [card: Card] }>();
+
+const displayedCards = computed(() => {
+  if (props.gregMode) return props.cards;
+  const groups = new Map<string, { card: Card; quantity: number }>();
+  for (const card of props.cards) {
+    const key = card.name.toLocaleLowerCase();
+    const group = groups.get(key);
+    if (!group) {
+      groups.set(key, { card, quantity: card.quantity });
+      continue;
+    }
+    group.quantity += card.quantity;
+    if (
+      card.quantity > group.card.quantity ||
+      (card.quantity === group.card.quantity &&
+        Boolean(card.releasedAt) &&
+        (!group.card.releasedAt || (card.releasedAt ?? "") < group.card.releasedAt))
+    ) {
+      group.card = card;
+    }
+  }
+  return [...groups.values()].map(({ card, quantity }) => ({ ...card, quantity }));
+});
 </script>
 
 <template>
@@ -21,7 +46,7 @@ defineEmits<{ move: [card: Card] }>();
     </div>
     <div class="grid grid-cols-2 gap-[11px] sm:grid-cols-[repeat(auto-fill,minmax(138px,1fr))]">
       <button
-        v-for="card in cards"
+        v-for="card in displayedCards"
         :key="cardIdentity(card)"
         :class="[
           'relative min-w-0 overflow-hidden rounded-[7px] border border-[#343739] bg-[#202325] p-0 text-left text-[#e8e7e0] transition duration-150 enabled:cursor-pointer enabled:hover:-translate-y-[3px] enabled:hover:border-[#df7548] disabled:cursor-default',

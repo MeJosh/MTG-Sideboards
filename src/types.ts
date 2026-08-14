@@ -3,6 +3,8 @@ export type Card = {
   quantity: number;
   image?: string;
   scryfallId?: string;
+  /** Scryfall's printing release date, used when choosing an art for grouped cards. */
+  releasedAt?: string;
   /** Set and collector number from a pasted decklist, used to find its exact printing. */
   setCode?: string;
   collectorNumber?: string;

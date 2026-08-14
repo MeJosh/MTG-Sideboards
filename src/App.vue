@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import DeckBreadcrumb from "./components/DeckBreadcrumb.vue";
 import DeckPile from "./components/DeckPile.vue";
 import DeckSidebar from "./components/DeckSidebar.vue";
@@ -21,6 +21,8 @@ const importError = ref("");
 const moxfieldFallbackOpen = ref(false);
 const loading = ref(false);
 const error = ref("");
+const GREG_MODE_KEY = "sideboard-lab-greg-mode-v1";
+const gregMode = ref(localStorage.getItem(GREG_MODE_KEY) === "true");
 
 const planner = useSideboardPlanner();
 const {
@@ -42,6 +44,18 @@ const {
 } = planner;
 const { fetchMoxfieldDeck, parseDeckText: parseDecklist, loadArt } = useDeckImport(plans);
 const markdown = useMarkdownPlans(fetchMoxfieldDeck, copyCards);
+const hasMultiplePrintings = computed(() => {
+  if (!selected.value) return false;
+  const printingsByName = new Map<string, Set<string>>();
+  for (const card of [...selected.value.mainboard, ...selected.value.sideboard]) {
+    const key = card.name.toLocaleLowerCase();
+    const printings = printingsByName.get(key) ?? new Set<string>();
+    printings.add(cardIdentity(card));
+    printingsByName.set(key, printings);
+    if (printings.size > 1) return true;
+  }
+  return false;
+});
 
 async function importMoxfieldDeck(source: string) {
   loading.value = true;
@@ -168,6 +182,8 @@ onMounted(() => {
   deckUrl.value = sharedDeckUrl;
   void importMoxfieldDeck(sharedDeckUrl);
 });
+
+watch(gregMode, (enabled) => localStorage.setItem(GREG_MODE_KEY, String(enabled)));
 </script>
 
 <template>
@@ -199,8 +215,11 @@ onMounted(() => {
         :deck-name="deckName"
         :has-selection="Boolean(selected)"
         :is-base="isBase"
+        :greg-mode="gregMode"
+        :show-greg-mode="hasMultiplePrintings"
         :matchup-name="selected && !isBase ? selected.name : undefined"
         @select-base="selectedId = 'base'"
+        @toggle-greg-mode="gregMode = !gregMode"
       />
       <div class="px-5 pt-[35px] pb-[50px] md:px-[clamp(24px,5vw,72px)] md:pt-[91px] md:pb-[70px]">
         <div v-if="!selected" class="mx-auto my-[17vh] max-w-[570px] text-center">
@@ -227,6 +246,7 @@ onMounted(() => {
             :cards="selected.mainboard"
             :total="total(selected.mainboard)"
             :disabled="isBase"
+            :greg-mode="gregMode"
             :moved-keys="isBase ? [] : (base?.sideboard.map(cardIdentity) ?? [])"
             moved-class="brought-in"
             @move="move($event, 'mainboard')"
@@ -237,6 +257,7 @@ onMounted(() => {
             :cards="selected.sideboard"
             :total="total(selected.sideboard)"
             :disabled="isBase"
+            :greg-mode="gregMode"
             :moved-keys="isBase ? [] : (base?.mainboard.map(cardIdentity) ?? [])"
             moved-class="moved-out"
             @move="move($event, 'sideboard')"

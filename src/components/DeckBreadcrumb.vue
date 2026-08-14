@@ -4,9 +4,11 @@ defineProps<{
   matchupName?: string;
   hasSelection: boolean;
   isBase: boolean;
+  gregMode: boolean;
+  showGregMode: boolean;
 }>();
 
-defineEmits<{ selectBase: [] }>();
+defineEmits<{ selectBase: []; toggleGregMode: [] }>();
 </script>
 
 <template>
@@ -27,5 +29,19 @@ defineEmits<{ selectBase: [] }>();
         {{ matchupName }}
       </strong>
     </template>
+    <button
+      v-if="showGregMode"
+      class="ml-auto rounded border px-2.5 py-1 font-mono text-[10px] font-medium tracking-[.08em] transition"
+      :class="
+        gregMode
+          ? 'border-[#d26a3b] bg-[#d26a3b] text-[#151719]'
+          : 'border-[#45494a] text-[#aaada8] hover:border-[#d26a3b] hover:text-[#f0a17b]'
+      "
+      type="button"
+      :aria-pressed="gregMode"
+      @click="$emit('toggleGregMode')"
+    >
+      Greg Mode {{ gregMode ? "On" : "Off" }}
+    </button>
   </div>
 </template>
