@@ -32,4 +32,7 @@ function moxfieldImporter(): Plugin {
   };
 }
 
-export default defineConfig({ plugins: [vue(), moxfieldImporter()] });
+export default defineConfig({
+  base: "/MTG-Sideboards/",
+  plugins: [vue(), moxfieldImporter()],
+});
