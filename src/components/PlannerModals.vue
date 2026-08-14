@@ -8,6 +8,7 @@ defineProps<{
   importOpen: boolean;
   importPreview: string;
   importError: string;
+  moxfieldFallbackOpen: boolean;
   loading: boolean;
 }>();
 
@@ -21,10 +22,53 @@ defineEmits<{
   "update:importPreview": [value: string];
   fileChanged: [event: Event];
   applyImport: [];
+  closeMoxfieldFallback: [];
 }>();
 </script>
 
 <template>
+  <div
+    v-if="moxfieldFallbackOpen"
+    class="fixed inset-0 z-20 grid place-items-center bg-[#040505bd] p-5 backdrop-blur-[3px]"
+    @click.self="$emit('closeMoxfieldFallback')"
+  >
+    <section
+      class="w-full max-w-[500px] rounded-[9px] border border-[#4a4d4b] bg-[#202325] p-[25px] shadow-[0_18px_55px_#0008]"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="moxfield-fallback-title"
+    >
+      <p class="font-mono text-[10px] font-medium tracking-[.1em] text-[#d98a66]">
+        MOXFIELD IMPORT UNAVAILABLE
+      </p>
+      <h2
+        id="moxfield-fallback-title"
+        class="mb-[10px] mt-0 font-display text-[25px] font-semibold"
+      >
+        Import your decklist by pasting it instead
+      </h2>
+      <p class="m-0 text-[13px] leading-[1.55] text-[#b7bbb4]">
+        Automatic Moxfield imports are not available on this site yet. You can still import the
+        exact decklist and card printings in a few steps:
+      </p>
+      <ol class="mb-0 mt-4 list-decimal space-y-2 pl-5 text-[13px] leading-[1.55] text-[#d9dbd5]">
+        <li>Open your deck’s page on Moxfield.</li>
+        <li>Choose <strong>Export for Moxfield</strong> and copy the decklist.</li>
+        <li>
+          Open <strong>Paste decklist instead</strong> in the sidebar, paste it, then select
+          <strong>Import pasted list</strong>.
+        </li>
+      </ol>
+      <div class="mt-6 flex justify-end">
+        <button
+          class="cursor-pointer rounded-md border border-[#e07152] bg-[#c9583b] px-3 py-[9px] text-[12px] font-bold text-white"
+          @click="$emit('closeMoxfieldFallback')"
+        >
+          Got it
+        </button>
+      </div>
+    </section>
+  </div>
   <div
     v-if="pendingDeletion"
     class="fixed inset-0 z-20 grid place-items-center bg-[#040505bd] p-5 backdrop-blur-[3px]"

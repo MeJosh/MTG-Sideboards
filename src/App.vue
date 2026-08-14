@@ -18,6 +18,7 @@ const copiedExport = ref(false);
 const importModalOpen = ref(false);
 const importPreview = ref("");
 const importError = ref("");
+const moxfieldFallbackOpen = ref(false);
 const loading = ref(false);
 const error = ref("");
 
@@ -49,8 +50,8 @@ async function importMoxfieldDeck(source: string) {
     const imported = await fetchMoxfieldDeck(source);
     setDeck(imported.name, imported.sourceUrl, imported.plan);
     await loadArt();
-  } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : "Could not import this deck.";
+  } catch {
+    moxfieldFallbackOpen.value = true;
   } finally {
     loading.value = false;
   }
@@ -108,6 +109,10 @@ function openImportModal() {
   importModalOpen.value = true;
   importPreview.value = "";
   importError.value = "";
+}
+
+function closeMoxfieldFallback() {
+  moxfieldFallbackOpen.value = false;
 }
 
 async function loadMarkdownFile(event: Event) {
@@ -253,6 +258,7 @@ onMounted(() => {
     :import-open="importModalOpen"
     :import-preview="importPreview"
     :import-error="importError"
+    :moxfield-fallback-open="moxfieldFallbackOpen"
     :loading="loading"
     @close-delete="pendingDeletion = null"
     @confirm-delete="deleteMatchup"
@@ -263,5 +269,6 @@ onMounted(() => {
     @update:import-preview="importPreview = $event"
     @file-changed="loadMarkdownFile"
     @apply-import="applyMarkdownImport"
+    @close-moxfield-fallback="closeMoxfieldFallback"
   />
 </template>
