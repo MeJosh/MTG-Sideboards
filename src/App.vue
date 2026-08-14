@@ -166,12 +166,6 @@ function delta(kind: "out" | "in") {
     }))
     .filter((c) => c.quantity > 0);
 }
-function reset() {
-  if (selected.value && base.value && !isBase.value) {
-    selected.value.mainboard = copy(base.value.mainboard);
-    selected.value.sideboard = copy(base.value.sideboard);
-  }
-}
 function deleteMatchup() {
   const plan = pendingDeletion.value;
   if (!plan || plan.id === "base") return;
@@ -448,8 +442,8 @@ watch(
         ><button class="deck-link" :disabled="!selected || isBase" @click="selectedId = 'base'">
           {{ selected ? deckName : "No deck loaded" }}</button
         ><template v-if="selected && !isBase"
-          ><span class="versus">VS</span><strong class="matchup-crumb">{{ selected.name }}</strong
-          ><button class="header-reset" @click="reset">Reset plan</button></template
+          ><span class="versus">VS</span
+          ><strong class="matchup-crumb">{{ selected.name }}</strong></template
         >
       </div>
       <div class="workspace-content">

@@ -30,20 +30,6 @@
 .deck-bar .deck-link:disabled {
   cursor: default;
 }
-.header-reset {
-  margin-left: auto;
-  border: 1px solid #454946;
-  border-radius: 5px;
-  background: transparent;
-  color: #c6c9c3;
-  padding: 5px 8px;
-  font-size: 10px;
-  cursor: pointer;
-}
-.header-reset:hover {
-  border-color: #d26a3b;
-  color: #f0a17b;
-}
 .grid button {
   position: relative;
 }
