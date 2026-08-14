@@ -1,4 +1,4 @@
-import type { Plan } from "../types";
+import { createId, type Plan } from "../types";
 
 type Importer = (source: string) => Promise<{ name: string; sourceUrl: string; plan: Plan }>;
 
@@ -68,7 +68,7 @@ export function useMarkdownPlans(
     const matchupPattern = /^###\s+(.+?)\s*$([\s\S]*?)(?=^###\s+|(?![\s\S]))/gm;
     for (const match of markdown.matchAll(matchupPattern)) {
       const plan: Plan = {
-        id: crypto.randomUUID(),
+        id: createId(),
         name: match[1].trim(),
         mainboard: copyCards(imported.plan.mainboard),
         sideboard: copyCards(imported.plan.sideboard),

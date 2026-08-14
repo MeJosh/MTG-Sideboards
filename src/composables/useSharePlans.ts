@@ -1,4 +1,4 @@
-import { cardIdentity, type Card, type Plan } from "../types";
+import { cardIdentity, createId, type Card, type Plan } from "../types";
 
 type EncodedMatchup = [name: string, out: number[], incoming: number[]];
 type EncodedCard = [quantity: number, setCode: string, collectorNumber: string, name: string];
@@ -205,7 +205,7 @@ export function useSharePlans(copyCards: (cards: Card[]) => Card[]) {
       base,
       ...shared.matchups.map(([name, out, incoming]) => {
         const plan: Plan = {
-          id: crypto.randomUUID(),
+          id: createId(),
           name,
           mainboard: copyCards(base.mainboard),
           sideboard: copyCards(base.sideboard),

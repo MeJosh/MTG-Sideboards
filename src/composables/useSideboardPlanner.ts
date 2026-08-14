@@ -1,5 +1,5 @@
 import { computed, ref, watch } from "vue";
-import { cardIdentity, type Card, type Plan } from "../types";
+import { cardIdentity, createId, type Card, type Plan } from "../types";
 
 const STORAGE_KEY = "sideboard-lab-v1";
 export type BoardName = "mainboard" | "sideboard";
@@ -25,7 +25,7 @@ export function useSideboardPlanner() {
 
   function addMatchup(name: string) {
     if (!base.value || !name.trim()) return;
-    const id = crypto.randomUUID();
+    const id = createId();
     plans.value.push({
       id,
       name: name.trim(),
