@@ -1,5 +1,5 @@
 <script setup lang="ts">
-type Card = { name: string; quantity: number; image?: string; scryfallId?: string };
+import type { Card } from "../types";
 
 defineProps<{
   title: string;
