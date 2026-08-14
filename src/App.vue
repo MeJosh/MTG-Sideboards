@@ -45,8 +45,9 @@ function cards(raw: unknown): Card[] {
   return parsed.filter((c): c is Card => c !== null);
 }
 async function fetchMoxfieldDeck(source: string) {
-  const id = source.match(/moxfield\.com\/decks\/([\w-]+)/i)?.[1];
-  if (!id) throw new Error("A valid Moxfield deck URL is required.");
+  const value = source.trim();
+  const id = /^[\w-]+$/.test(value) ? value : value.match(/moxfield\.com\/decks\/([\w-]+)/i)?.[1];
+  if (!id) throw new Error("A valid Moxfield deck URL or deck ID is required.");
   const res = await fetch(`/api/moxfield/decks/all/${id}`);
   if (!res.ok) throw new Error("Moxfield could not find that deck.");
   const data = await res.json(),
@@ -60,10 +61,13 @@ async function fetchMoxfieldDeck(source: string) {
   };
 }
 async function importDeck() {
+  await importMoxfieldDeck(deckUrl.value);
+}
+async function importMoxfieldDeck(source: string) {
   loading.value = true;
   error.value = "";
   try {
-    const imported = await fetchMoxfieldDeck(deckUrl.value);
+    const imported = await fetchMoxfieldDeck(source);
     deckName.value = imported.name;
     deckSourceUrl.value = imported.sourceUrl;
     plans.value = [imported.plan];
@@ -354,6 +358,15 @@ onMounted(() => {
   } catch {
     /* ignore stale storage */
   }
+
+  const url = new URL(window.location.href);
+  const sharedDeckUrl = url.searchParams.get("moxfield");
+  if (!sharedDeckUrl) return;
+
+  url.searchParams.delete("moxfield");
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  deckUrl.value = sharedDeckUrl;
+  void importMoxfieldDeck(sharedDeckUrl);
 });
 watch(
   [plans, deckName, deckSourceUrl, selectedId],
