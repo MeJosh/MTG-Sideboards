@@ -60,6 +60,50 @@
   background: linear-gradient(90deg, rgba(14, 16, 18, 0.93), rgba(14, 16, 18, 0.76));
   backdrop-filter: blur(4px);
 }
+.export-modal {
+  width: min(94vw, 1200px);
+  max-height: 90vh;
+}
+.export-preview {
+  display: block;
+  width: 100%;
+  max-height: min(72vh, 820px);
+  overflow: auto;
+  margin: 16px 0 0;
+  padding: 13px;
+  background: #111315;
+  border: 1px solid #3b3f3d;
+  border-radius: 6px;
+  color: #d9dbd5;
+  white-space: pre;
+  font: 12px/1.55 "DM Mono";
+}
+.import-modal {
+  width: min(94vw, 1000px);
+}
+.import-preview {
+  display: block;
+  width: 100%;
+  height: min(58vh, 650px);
+  margin: 16px 0 0;
+  padding: 13px;
+  resize: none;
+  background: #111315;
+  border: 1px solid #3b3f3d;
+  border-radius: 6px;
+  color: #d9dbd5;
+  font: 12px/1.55 "DM Mono";
+}
+.import-error {
+  margin: 10px 0 0 !important;
+  color: #ed9073 !important;
+}
+.copy-export {
+  border: 1px solid #527b92;
+  background: #243943;
+  color: #d7edf5;
+  font-weight: 700;
+}
 @media (min-width: 721px) {
   .deck-bar {
     position: fixed !important;

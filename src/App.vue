@@ -7,9 +7,15 @@ const URL_KEY = "sideboard-lab-v1";
 const deckUrl = ref("");
 const deckText = ref("");
 const deckName = ref("Untitled deck");
+const deckSourceUrl = ref("");
 const plans = ref<Plan[]>([]);
 const selectedId = ref("base");
 const pendingDeletion = ref<Plan | null>(null);
+const exportPreview = ref("");
+const copiedExport = ref(false);
+const importModalOpen = ref(false);
+const importPreview = ref("");
+const importError = ref("");
 const fileInput = ref<HTMLInputElement | null>(null);
 const loading = ref(false);
 const error = ref("");
@@ -38,23 +44,29 @@ function cards(raw: unknown): Card[] {
   });
   return parsed.filter((c): c is Card => c !== null);
 }
+async function fetchMoxfieldDeck(source: string) {
+  const id = source.match(/moxfield\.com\/decks\/([\w-]+)/i)?.[1];
+  if (!id) throw new Error("A valid Moxfield deck URL is required.");
+  const res = await fetch(`/api/moxfield/decks/all/${id}`);
+  if (!res.ok) throw new Error("Moxfield could not find that deck.");
+  const data = await res.json(),
+    mainboard = cards(data.boards?.mainboard?.cards ?? data.mainboard),
+    sideboard = cards(data.boards?.sideboard?.cards ?? data.sideboard);
+  if (!mainboard.length) throw new Error("This deck has no main deck to import.");
+  return {
+    name: data.name || "Imported deck",
+    sourceUrl: `https://www.moxfield.com/decks/${id}`,
+    plan: { id: "base", name: "Base Decklist", mainboard, sideboard } satisfies Plan,
+  };
+}
 async function importDeck() {
-  const id = deckUrl.value.match(/moxfield\.com\/decks\/([\w-]+)/i)?.[1];
-  if (!id) {
-    error.value = "Paste a Moxfield deck URL to import it.";
-    return;
-  }
   loading.value = true;
   error.value = "";
   try {
-    const res = await fetch(`/api/moxfield/decks/all/${id}`);
-    if (!res.ok) throw new Error("Moxfield could not find that deck.");
-    const data = await res.json(),
-      mainboard = cards(data.boards?.mainboard?.cards ?? data.mainboard),
-      sideboard = cards(data.boards?.sideboard?.cards ?? data.sideboard);
-    if (!mainboard.length) throw new Error("This deck has no main deck to import.");
-    deckName.value = data.name || "Imported deck";
-    plans.value = [{ id: "base", name: "Base Decklist", mainboard, sideboard }];
+    const imported = await fetchMoxfieldDeck(deckUrl.value);
+    deckName.value = imported.name;
+    deckSourceUrl.value = imported.sourceUrl;
+    plans.value = [imported.plan];
     selectedId.value = "base";
     await loadArt();
   } catch (e) {
@@ -87,6 +99,7 @@ function parseDeckText() {
     return;
   }
   deckName.value = "Imported deck";
+  deckSourceUrl.value = "";
   plans.value = [{ id: "base", name: "Base Decklist", mainboard, sideboard }];
   selectedId.value = "base";
   error.value = "";
@@ -174,25 +187,36 @@ function yamlCards(cards: Card[]) {
     )
     .join("\n");
 }
-function exportMarkdown() {
+function exportFilename() {
+  return `${
+    deckName.value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "sideboard-plan"
+  }.md`;
+}
+function openExportPreview() {
   if (!base.value) return;
   const sections = plans.value.slice(1).map((plan) => {
     const out = changesFor(plan, "out").map((card) => `-${card.quantity} ${card.name}`);
     const incoming = changesFor(plan, "in").map((card) => `+${card.quantity} ${card.name}`);
     return `### ${plan.name}\n\n${[...out, ...incoming].join("\n") || "No swaps."}`;
   });
-  const markdown = `---\ntitle: ${JSON.stringify(deckName.value)}\ndecklist:\n  mainboard:\n${yamlCards(base.value.mainboard)}\n  sideboard:\n${yamlCards(base.value.sideboard)}\n---\n\n## Sideboarding\n${sections.length ? `\n${sections.join("\n\n")}` : ""}\n`;
-  const blob = new Blob([markdown], { type: "text/markdown" });
+  const source = deckSourceUrl.value ? `source: ${JSON.stringify(deckSourceUrl.value)}\n` : "";
+  exportPreview.value = `---\ntitle: ${JSON.stringify(deckName.value)}\n${source}---\n\n## Sideboarding\n${sections.length ? `\n${sections.join("\n\n")}` : ""}\n`;
+  copiedExport.value = false;
+}
+function saveExport() {
+  const blob = new Blob([exportPreview.value], { type: "text/markdown" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = `${
-    deckName.value
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "") || "sideboard-plan"
-  }.md`;
+  link.download = exportFilename();
   link.click();
   URL.revokeObjectURL(link.href);
+}
+async function copyExport() {
+  await navigator.clipboard.writeText(exportPreview.value);
+  copiedExport.value = true;
 }
 function readDeckLine(line: string): Card | null {
   const value = line.replace(/^\s*-\s*/, "").trim();
@@ -226,44 +250,35 @@ function changesFor(plan: Plan, kind: "out" | "in") {
     }))
     .filter((c) => c.quantity > 0);
 }
-function importMarkdown(markdown: string) {
+async function importMarkdown(markdown: string) {
   const frontmatter = /^---\s*\n([\s\S]*?)\n---/.exec(markdown)?.[1];
-  if (!frontmatter) throw new Error("This file needs YAML frontmatter containing a decklist.");
-  let mode: "mainboard" | "sideboard" | null = null;
-  const mainboard: Card[] = [],
-    sideboard: Card[] = [];
-  let title = "Imported deck";
+  if (!frontmatter) throw new Error("This file needs YAML frontmatter.");
+  let sourceUrl = "";
   for (const line of frontmatter.split(/\r?\n/)) {
-    const titleMatch = /^title:\s*(.+)$/.exec(line);
-    if (titleMatch) {
+    const sourceMatch = /^source:\s*(.+)$/.exec(line);
+    if (sourceMatch) {
       try {
-        title = JSON.parse(titleMatch[1]);
+        sourceUrl = JSON.parse(sourceMatch[1]);
       } catch {
-        title = titleMatch[1].trim();
+        sourceUrl = sourceMatch[1].trim();
       }
     }
-    if (/^\s{2}mainboard:\s*$/.test(line)) {
-      mode = "mainboard";
-      continue;
-    }
-    if (/^\s{2}sideboard:\s*$/.test(line)) {
-      mode = "sideboard";
-      continue;
-    }
-    const card = mode ? readDeckLine(line) : null;
-    if (card) (mode === "mainboard" ? mainboard : sideboard).push(card);
   }
-  if (!mainboard.length)
-    throw new Error("No mainboard cards were found in the Markdown frontmatter.");
-  const importedBase: Plan = { id: "base", name: "Base Decklist", mainboard, sideboard };
-  const importedPlans: Plan[] = [importedBase];
+  const imported = sourceUrl
+    ? await fetchMoxfieldDeck(sourceUrl)
+    : base.value
+      ? { name: deckName.value, sourceUrl: deckSourceUrl.value, plan: copyPlan(base.value) }
+      : (() => {
+          throw new Error("Load a deck first, or import Markdown with a Moxfield source URL.");
+        })();
+  const importedPlans: Plan[] = [imported.plan];
   const matchupPattern = /^###\s+(.+?)\s*$([\s\S]*?)(?=^###\s+|(?![\s\S]))/gm;
   for (const match of markdown.matchAll(matchupPattern)) {
     const plan: Plan = {
       id: crypto.randomUUID(),
       name: match[1].trim(),
-      mainboard: copy(mainboard),
-      sideboard: copy(sideboard),
+      mainboard: copy(imported.plan.mainboard),
+      sideboard: copy(imported.plan.sideboard),
     };
     for (const line of match[2].split(/\r?\n/)) {
       const swap = /^([+-])(\d+)\s+(.+?)\s*$/.exec(line);
@@ -283,20 +298,53 @@ function importMarkdown(markdown: string) {
     importedPlans.push(plan);
   }
   plans.value = importedPlans;
-  deckName.value = title;
+  deckName.value = imported.name;
+  deckSourceUrl.value = imported.sourceUrl;
   selectedId.value = "base";
   error.value = "";
-  void loadArt();
+  await loadArt();
 }
-async function readMarkdownFile(event: Event) {
+function copyPlan(plan: Plan): Plan {
+  return {
+    ...plan,
+    mainboard: copy(plan.mainboard),
+    sideboard: copy(plan.sideboard),
+  };
+}
+function openImportModal() {
+  importModalOpen.value = true;
+  importPreview.value = "";
+  importError.value = "";
+}
+async function loadMarkdownFile(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0];
   if (!file) return;
   try {
-    importMarkdown(await file.text());
+    importPreview.value = await file.text();
+    importError.value = "";
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : "Could not import that Markdown file.";
+    importError.value =
+      cause instanceof Error ? cause.message : "Could not read that Markdown file.";
   } finally {
     (event.target as HTMLInputElement).value = "";
+  }
+}
+async function applyMarkdownImport() {
+  if (!importPreview.value.trim()) {
+    importError.value = "Paste Markdown or choose a file first.";
+    return;
+  }
+  loading.value = true;
+  try {
+    await importMarkdown(importPreview.value);
+    importPreview.value = "";
+    importError.value = "";
+    importModalOpen.value = false;
+  } catch (cause) {
+    importError.value =
+      cause instanceof Error ? cause.message : "Could not import that Markdown file.";
+  } finally {
+    loading.value = false;
   }
 }
 const total = (pile?: Card[]) => pile?.reduce((sum, c) => sum + c.quantity, 0) ?? 0;
@@ -306,6 +354,7 @@ onMounted(() => {
     if (saved.plans?.length) {
       plans.value = saved.plans;
       deckName.value = saved.deckName || deckName.value;
+      deckSourceUrl.value = saved.deckSourceUrl || "";
       selectedId.value = saved.selectedId || "base";
     }
   } catch {
@@ -313,13 +362,14 @@ onMounted(() => {
   }
 });
 watch(
-  [plans, deckName, selectedId],
+  [plans, deckName, deckSourceUrl, selectedId],
   () =>
     localStorage.setItem(
       URL_KEY,
       JSON.stringify({
         plans: plans.value,
         deckName: deckName.value,
+        deckSourceUrl: deckSourceUrl.value,
         selectedId: selectedId.value,
       }),
     ),
@@ -386,9 +436,9 @@ watch(
             class="file-input"
             type="file"
             accept=".md,text/markdown"
-            @change="readMarkdownFile"
-          /><button class="tool-button" @click="fileInput?.click()">Import</button
-          ><button class="tool-button" :disabled="!base" @click="exportMarkdown">Export</button>
+            @change="loadMarkdownFile"
+          /><button class="tool-button" @click="openImportModal">Import</button
+          ><button class="tool-button" :disabled="!base" @click="openExportPreview">Export</button>
         </div>
       </div>
     </aside>
@@ -466,6 +516,50 @@ watch(
       <div class="modal-actions">
         <button class="cancel" @click="pendingDeletion = null">Cancel</button
         ><button class="confirm-delete" @click="deleteMatchup">Delete matchup</button>
+      </div>
+    </section>
+  </div>
+  <div v-if="exportPreview" class="modal-backdrop" @click.self="exportPreview = ''">
+    <section
+      class="modal export-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="export-title"
+    >
+      <p class="eyebrow">MARKDOWN EXPORT</p>
+      <pre id="export-title" class="export-preview" aria-label="Markdown export preview">{{
+        exportPreview
+      }}</pre>
+      <div class="modal-actions">
+        <button class="cancel" @click="exportPreview = ''">Close</button>
+        <button class="copy-export" @click="copyExport">
+          {{ copiedExport ? "Copied" : "Copy" }}
+        </button>
+        <button class="confirm-delete" @click="saveExport">Save file</button>
+      </div>
+    </section>
+  </div>
+  <div v-if="importModalOpen" class="modal-backdrop" @click.self="importModalOpen = false">
+    <section
+      class="modal import-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="import-title"
+    >
+      <p id="import-title" class="eyebrow">MARKDOWN IMPORT</p>
+      <textarea
+        v-model="importPreview"
+        class="import-preview"
+        aria-label="Markdown import content"
+        placeholder="Paste your sideboard Markdown here, or upload a .md file."
+      ></textarea>
+      <p v-if="importError" class="import-error">{{ importError }}</p>
+      <div class="modal-actions">
+        <button class="cancel" @click="importModalOpen = false">Close</button>
+        <button class="copy-export" @click="fileInput?.click()">Upload file</button>
+        <button class="confirm-delete" :disabled="loading" @click="applyMarkdownImport">
+          {{ loading ? "Importing…" : "Import" }}
+        </button>
       </div>
     </section>
   </div>
