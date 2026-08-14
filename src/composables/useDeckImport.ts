@@ -1,6 +1,53 @@
 import type { Ref } from "vue";
 import type { Card, Plan } from "../types";
 
+const ART_CACHE_KEY = "sideboard-lab-scryfall-art-v1";
+const SCRYFALL_REQUEST_INTERVAL_MS = 125;
+const RETRY_DELAYS_MS = [1_000, 2_000, 4_000];
+let scryfallQueue = Promise.resolve();
+let nextScryfallRequestAt = 0;
+
+type ArtCache = Record<string, string>;
+
+function cardKey(card: Card) {
+  return card.setCode && card.collectorNumber
+    ? `${card.setCode.toLowerCase()}/${card.collectorNumber}`
+    : `name/${card.name.toLowerCase()}`;
+}
+
+function readArtCache(): ArtCache {
+  try {
+    const cached = JSON.parse(localStorage.getItem(ART_CACHE_KEY) ?? "{}");
+    return cached && typeof cached === "object" ? cached : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeArtCache(cache: ArtCache) {
+  try {
+    localStorage.setItem(ART_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    /* Images still work for this session if storage is unavailable. */
+  }
+}
+
+const pause = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+function fetchFromScryfall(url: string) {
+  const request = scryfallQueue.then(async () => {
+    await pause(Math.max(0, nextScryfallRequestAt - Date.now()));
+    nextScryfallRequestAt = Date.now() + SCRYFALL_REQUEST_INTERVAL_MS;
+    return fetch(url);
+  });
+  // Keep the queue usable after a browser-level (including CORS-masked 429) failure.
+  scryfallQueue = request.then(
+    () => undefined,
+    () => undefined,
+  );
+  return request;
+}
+
 function cards(raw: unknown): Card[] {
   if (!raw || typeof raw !== "object") return [];
   const list = Array.isArray(raw)
@@ -90,47 +137,48 @@ export function useDeckImport(plans: Ref<Plan[]>) {
   }
 
   async function loadArt() {
-    const unresolved = new Map(
-      plans.value
-        .flatMap((plan) => [...plan.mainboard, ...plan.sideboard])
-        .filter((card) => !card.image)
-        .map((card) => [
-          card.setCode && card.collectorNumber
-            ? `${card.setCode}/${card.collectorNumber}`
-            : `name/${card.name.toLowerCase()}`,
-          card,
-        ]),
-    );
-    for (const [key, card] of unresolved) {
-      try {
-        const response =
-          card.setCode && card.collectorNumber
-            ? await fetch(
-                `https://api.scryfall.com/cards/${encodeURIComponent(card.setCode)}/${encodeURIComponent(card.collectorNumber)}`,
-              )
-            : await fetch(
-                `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(card.name)}`,
-              );
-        if (!response.ok) continue;
-        const data = await response.json();
-        const image = data.image_uris?.art_crop ?? data.card_faces?.[0]?.image_uris?.art_crop;
-        if (image)
-          plans.value.forEach((plan) =>
-            [...plan.mainboard, ...plan.sideboard]
-              .filter((candidate) => {
-                const candidateKey =
-                  candidate.setCode && candidate.collectorNumber
-                    ? `${candidate.setCode}/${candidate.collectorNumber}`
-                    : `name/${candidate.name.toLowerCase()}`;
-                return candidateKey === key;
-              })
-              .forEach((candidate) => (candidate.image = image)),
-          );
-      } catch {
-        /* card remains text-only */
-      }
-      await new Promise((resolve) => setTimeout(resolve, 75));
+    const cache = readArtCache();
+    const unresolved = new Map<string, Card>();
+    // Plans and each board retain decklist order, so requests visibly fill from top to bottom.
+    const orderedCards = plans.value.flatMap((plan) => [...plan.mainboard, ...plan.sideboard]);
+    for (const card of orderedCards) {
+      if (card.image) continue;
+      const key = cardKey(card);
+      const image = cache[key];
+      if (image) card.image = image;
+      else if (!unresolved.has(key)) unresolved.set(key, card);
     }
+
+    for (const [key, card] of unresolved) {
+      const url =
+        card.setCode && card.collectorNumber
+          ? `https://api.scryfall.com/cards/${encodeURIComponent(card.setCode)}/${encodeURIComponent(card.collectorNumber)}`
+          : `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(card.name)}`;
+
+      for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+        try {
+          const response = await fetchFromScryfall(url);
+          if (response.ok) {
+            const data = await response.json();
+            const image = data.image_uris?.art_crop ?? data.card_faces?.[0]?.image_uris?.art_crop;
+            if (image) {
+              cache[key] = image;
+              plans.value.forEach((plan) =>
+                [...plan.mainboard, ...plan.sideboard]
+                  .filter((candidate) => cardKey(candidate) === key)
+                  .forEach((candidate) => (candidate.image = image)),
+              );
+            }
+            break;
+          }
+          if (response.status !== 429) break;
+        } catch {
+          // A rate-limited Scryfall response omits CORS headers, so browsers expose it as a fetch error.
+        }
+        if (attempt < RETRY_DELAYS_MS.length) await pause(RETRY_DELAYS_MS[attempt]);
+      }
+    }
+    writeArtCache(cache);
   }
 
   return { fetchMoxfieldDeck, parseDeckText, loadArt };
