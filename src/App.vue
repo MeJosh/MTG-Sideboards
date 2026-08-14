@@ -385,91 +385,170 @@ watch(
 </script>
 
 <template>
-  <main>
-    <aside>
-      <div class="brand">
-        <b>S</b><span><strong>Sideboard Lab</strong><small>MTG matchup planner</small></span>
+  <main
+    class="grid min-h-screen grid-cols-1 bg-[#151719] md:h-screen md:min-h-0 md:grid-cols-[276px_1fr] md:overflow-hidden"
+  >
+    <aside
+      class="flex flex-col border-b border-[#292c2e] bg-[#0e1012] p-5 md:h-screen md:min-h-0 md:overflow-y-auto md:border-r md:border-b-0 md:px-5 md:pt-[29px] md:pb-5"
+    >
+      <div class="flex items-center gap-2.5 px-2 pb-[18px] md:pb-[29px]">
+        <b
+          class="grid size-[30px] place-items-center rounded-lg bg-[#d26a3b] font-display text-[20px] font-bold text-[#1c120e]"
+          >S</b
+        ><span
+          ><strong class="block text-[15px]">Sideboard Lab</strong
+          ><small class="block text-[11px] text-[#868a85]">MTG matchup planner</small></span
+        >
       </div>
-      <div class="import">
-        <label>Moxfield deck URL</label>
-        <div>
+      <div class="border-y border-[#292c2e] py-[17px]">
+        <label class="font-mono text-[10px] font-medium tracking-[.1em] text-[#8d918b]"
+          >Moxfield deck URL</label
+        >
+        <div class="mt-2 flex">
           <input
+            class="min-w-0 w-full rounded-l-md border border-r-0 border-[#303438] bg-[#1b1e20] px-2 py-[9px] text-[11px] text-[#eee] outline-none focus:border-[#d26a3b]"
             v-model="deckUrl"
             @keyup.enter="importDeck"
             placeholder="moxfield.com/decks/..."
-          /><button @click="importDeck" :disabled="loading">
+          /><button
+            class="cursor-pointer rounded-r-md bg-[#d26a3b] px-[9px] text-[11px] font-bold disabled:cursor-default"
+            @click="importDeck"
+            :disabled="loading"
+          >
             {{ loading ? "..." : "Import" }}
           </button>
         </div>
-        <p v-if="error">{{ error }}</p>
-        <details>
-          <summary>Paste decklist instead</summary>
+        <p v-if="error" class="mt-[9px] mx-0.5 text-[11px] text-[#ef8b71]">{{ error }}</p>
+        <details class="mt-[11px] text-[11px] text-[#a9ada7]">
+          <summary class="cursor-pointer text-[#d98a66]">Paste decklist instead</summary>
           <textarea
+            class="mt-2 block min-h-[100px] w-full resize-y rounded-md border border-[#303438] bg-[#1b1e20] p-2 font-mono text-[10px] text-[#eee]"
             v-model="deckText"
             placeholder="4 Lightning Bolt&#10;...&#10;Sideboard&#10;2 Red Elemental Blast"
           ></textarea
-          ><button class="text-import" @click="parseDeckText">Import pasted list</button>
+          ><button
+            class="mt-[7px] cursor-pointer rounded-[5px] bg-[#34383a] px-[9px] py-[7px] text-[11px] text-[#ddd]"
+            @click="parseDeckText"
+          >
+            Import pasted list
+          </button>
         </details>
       </div>
-      <label class="plans-label">MATCH PLANS</label>
-      <nav>
+      <label
+        class="px-2 pt-[23px] pb-[9px] font-mono text-[10px] font-medium tracking-[.1em] text-[#8d918b]"
+        >MATCH PLANS</label
+      >
+      <nav class="grid gap-[3px]">
         <div
           v-for="plan in plans"
           :key="plan.id"
-          class="match-row"
-          :class="{ active: plan.id === selectedId }"
+          :class="[
+            'group flex items-center rounded-md',
+            { 'bg-[#282b2d]': plan.id === selectedId },
+          ]"
         >
-          <button class="match-select" @click="selectedId = plan.id"><i></i>{{ plan.name }}</button
+          <button
+            :class="[
+              'min-w-0 flex-1 cursor-pointer rounded-md bg-transparent px-[9px] py-[10px] text-left text-[13px] text-[#c0c3bc] hover:bg-[#1b1e20]',
+              {
+                '!bg-transparent font-semibold text-white hover:bg-transparent':
+                  plan.id === selectedId,
+              },
+            ]"
+            @click="selectedId = plan.id"
+          >
+            <i
+              :class="[
+                'mr-[9px] mb-px inline-block size-1.5 rounded-full bg-[#686d68]',
+                { 'bg-[#d26a3b]': plan.id === selectedId },
+              ]"
+            ></i
+            >{{ plan.name }}</button
           ><button
             v-if="plan.id !== 'base'"
-            class="delete-match"
+            :class="[
+              plan.id === selectedId ? 'block' : 'hidden group-hover:block',
+              'w-7 cursor-pointer bg-transparent px-[6px] py-[7px] text-center text-[18px] leading-none text-[#aeb1ab] hover:text-[#f2906d]',
+            ]"
             :aria-label="`Delete ${plan.name}`"
             @click="pendingDeletion = plan"
           >
             ×
           </button>
         </div>
-        <button class="add" :disabled="!base" @click="addMatchup">＋ Add Matchup</button>
+        <button
+          class="mt-[3px] w-full cursor-pointer rounded-md bg-transparent px-[9px] py-[10px] text-left text-[13px] text-[#d8845f] hover:bg-[#1b1e20]"
+          :disabled="!base"
+          @click="addMatchup"
+        >
+          ＋ Add Matchup
+        </button>
       </nav>
-      <div class="sidebar-tools">
-        <small class="count">{{
+      <div class="mt-auto border-t border-[#292c2e] px-2 pt-[15px]">
+        <small class="mb-[10px] block p-0 font-mono text-[10px] text-[#747872] max-md:hidden">{{
           base
             ? `${total(base.mainboard)} main · ${total(base.sideboard)} sideboard`
             : "Import a 60/15 deck to begin"
         }}</small>
-        <div>
+        <div class="grid grid-cols-2 gap-1.5">
           <input
             ref="fileInput"
-            class="file-input"
+            class="hidden"
             type="file"
             accept=".md,text/markdown"
             @change="loadMarkdownFile"
-          /><button class="tool-button" @click="openImportModal">Import</button
-          ><button class="tool-button" :disabled="!base" @click="openExportPreview">Export</button>
+          /><button
+            class="cursor-pointer rounded-[5px] border border-[#454946] bg-transparent p-[7px] text-[11px] text-[#c6c9c3] hover:border-[#d26a3b] hover:text-[#eea17c] disabled:cursor-default disabled:opacity-45"
+            @click="openImportModal"
+          >
+            Import</button
+          ><button
+            class="cursor-pointer rounded-[5px] border border-[#454946] bg-transparent p-[7px] text-[11px] text-[#c6c9c3] hover:border-[#d26a3b] hover:text-[#eea17c] disabled:cursor-default disabled:opacity-45"
+            :disabled="!base"
+            @click="openExportPreview"
+          >
+            Export
+          </button>
         </div>
       </div>
     </aside>
-    <section class="workspace">
-      <div class="deck-bar">
-        <span>DECK</span
-        ><button class="deck-link" :disabled="!selected || isBase" @click="selectedId = 'base'">
+    <section class="w-full max-w-[1380px] md:h-screen md:overflow-y-auto">
+      <div
+        class="sticky top-0 z-5 flex min-h-[53px] items-center gap-[11px] border-b border-[#303335] bg-[#151719ef] px-5 backdrop-blur-[10px] md:fixed md:left-[276px] md:right-0 md:px-[clamp(24px,5vw,72px)]"
+      >
+        <span class="font-mono text-[10px] font-medium tracking-[.11em] text-[#c97147]">DECK</span
+        ><button
+          class="cursor-pointer overflow-hidden border-0 bg-transparent p-0 text-ellipsis whitespace-nowrap text-[13px] font-bold text-[#e9e8e1] hover:enabled:text-[#f0a17b] hover:enabled:underline hover:enabled:underline-offset-[3px] disabled:cursor-default"
+          :disabled="!selected || isBase"
+          @click="selectedId = 'base'"
+        >
           {{ selected ? deckName : "No deck loaded" }}</button
         ><template v-if="selected && !isBase"
-          ><span class="versus">VS</span
-          ><strong class="matchup-crumb">{{ selected.name }}</strong></template
+          ><span class="font-mono text-[10px] font-medium tracking-[.11em] text-[#75a7bd]">VS</span
+          ><strong
+            class="overflow-hidden text-ellipsis whitespace-nowrap text-[13px] text-[#d8e5e9]"
+            >{{ selected.name }}</strong
+          ></template
         >
       </div>
-      <div class="workspace-content">
-        <div v-if="!selected" class="empty">
-          <label>SIDEBOARD LAB</label>
-          <h1>Plan every post-board game.</h1>
-          <p>
+      <div class="px-5 pt-[35px] pb-[50px] md:px-[clamp(24px,5vw,72px)] md:pt-[91px] md:pb-[70px]">
+        <div v-if="!selected" class="mx-auto my-[17vh] max-w-[570px] text-center">
+          <label class="font-mono text-[10px] font-medium tracking-[.1em] text-[#8d918b]"
+            >SIDEBOARD LAB</label
+          >
+          <h1 class="my-2 font-display text-[46px] font-semibold tracking-[-.04em]">
+            Plan every post-board game.
+          </h1>
+          <p class="mt-0 leading-[1.6] text-[#a0a49e]">
             Import a Moxfield deck with a 60-card main deck and 15-card sideboard to map your
             matchup plans.
           </p>
         </div>
         <template v-else
-          ><div v-if="isBase" class="hint">
+          ><div
+            v-if="isBase"
+            class="mb-[31px] -mt-3 border-l-2 border-[#d26a3b] bg-[#1d211f] px-[13px] py-[11px] text-[12px] text-[#aaada8]"
+          >
             Create a matchup plan to start moving cards between your main deck and sideboard.
           </div>
           <DeckPile
@@ -482,7 +561,7 @@ watch(
             @move="move($event, 'mainboard')"
           /><DeckPile
             title="Sideboard"
-            class="side"
+            class="mt-[46px]"
             :cards="selected.sideboard"
             :total="total(selected.sideboard)"
             :disabled="isBase"
@@ -490,23 +569,39 @@ watch(
             moved-class="moved-out"
             @move="move($event, 'sideboard')"
           />
-          <footer v-if="!isBase">
+          <footer
+            v-if="!isBase"
+            class="mt-[60px] grid gap-[14px] rounded-lg border border-[#383b3a] bg-[#1a1d1e] px-6 py-[22px] md:grid-cols-[180px_1fr] md:gap-[25px]"
+          >
             <div>
-              <label>SIDEBOARD GUIDE</label>
-              <h2>{{ selected.name }}</h2>
+              <label class="font-mono text-[10px] font-medium tracking-[.1em] text-[#8d918b]"
+                >SIDEBOARD GUIDE</label
+              >
+              <h2 class="m-0 font-display text-[19px] font-semibold">{{ selected.name }}</h2>
             </div>
-            <div class="changes">
-              <div class="removals">
-                <p v-for="c in delta('out')" :key="`o${c.name}`" class="out">
+            <div class="grid grid-cols-2 gap-[18px]">
+              <div class="min-w-0">
+                <p
+                  v-for="c in delta('out')"
+                  :key="`o${c.name}`"
+                  class="my-[3px] font-mono text-[13px] text-[#e9ad94]"
+                >
                   −{{ c.quantity }} {{ c.name }}
                 </p>
               </div>
-              <div class="additions">
-                <p v-for="c in delta('in')" :key="`i${c.name}`" class="in">
+              <div class="min-w-0">
+                <p
+                  v-for="c in delta('in')"
+                  :key="`i${c.name}`"
+                  class="my-[3px] font-mono text-[13px] text-[#a6cf9f]"
+                >
                   +{{ c.quantity }} {{ c.name }}
                 </p>
               </div>
-              <p v-if="!delta('out').length && !delta('in').length" class="muted">
+              <p
+                v-if="!delta('out').length && !delta('in').length"
+                class="col-span-full my-[3px] font-mono text-[13px] text-[#858984]"
+              >
                 No swaps yet — click cards to build your plan.
               </p>
             </div>
@@ -515,56 +610,121 @@ watch(
       </div>
     </section>
   </main>
-  <div v-if="pendingDeletion" class="modal-backdrop" @click.self="pendingDeletion = null">
-    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="delete-title">
-      <p class="eyebrow">DELETE MATCHUP</p>
-      <h2 id="delete-title">Remove {{ pendingDeletion.name }}?</h2>
-      <p>This deletes its sideboard plan permanently. This action can’t be undone.</p>
-      <div class="modal-actions">
-        <button class="cancel" @click="pendingDeletion = null">Cancel</button
-        ><button class="confirm-delete" @click="deleteMatchup">Delete matchup</button>
+  <div
+    v-if="pendingDeletion"
+    class="fixed inset-0 z-20 grid place-items-center bg-[#040505bd] p-5 backdrop-blur-[3px]"
+    @click.self="pendingDeletion = null"
+  >
+    <section
+      class="w-full max-w-[390px] rounded-[9px] border border-[#4a4d4b] bg-[#202325] p-[25px] shadow-[0_18px_55px_#0008]"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-title"
+    >
+      <p class="font-mono text-[10px] font-medium tracking-[.1em] text-[#8d918b]">DELETE MATCHUP</p>
+      <h2 id="delete-title" class="mb-[10px] mt-0 font-display text-[25px] font-semibold">
+        Remove {{ pendingDeletion.name }}?
+      </h2>
+      <p class="m-0 text-[13px] leading-[1.55] text-[#b7bbb4]">
+        This deletes its sideboard plan permanently. This action can’t be undone.
+      </p>
+      <div class="mt-6 flex justify-end gap-[9px]">
+        <button
+          class="cursor-pointer rounded-md border border-[#4a4d4b] bg-transparent px-3 py-[9px] text-[12px] text-[#d1d3ce]"
+          @click="pendingDeletion = null"
+        >
+          Cancel</button
+        ><button
+          class="cursor-pointer rounded-md border border-[#e07152] bg-[#c9583b] px-3 py-[9px] text-[12px] font-bold text-white"
+          @click="deleteMatchup"
+        >
+          Delete matchup
+        </button>
       </div>
     </section>
   </div>
-  <div v-if="exportPreview" class="modal-backdrop" @click.self="exportPreview = ''">
+  <div
+    v-if="exportPreview"
+    class="fixed inset-0 z-20 grid place-items-center bg-[#040505bd] p-5 backdrop-blur-[3px]"
+    @click.self="exportPreview = ''"
+  >
     <section
-      class="modal export-modal"
+      class="max-h-[90vh] w-[min(94vw,1200px)] rounded-[9px] border border-[#4a4d4b] bg-[#202325] p-[25px] shadow-[0_18px_55px_#0008]"
       role="dialog"
       aria-modal="true"
       aria-labelledby="export-title"
     >
-      <p class="eyebrow">MARKDOWN EXPORT</p>
-      <pre id="export-title" class="export-preview" aria-label="Markdown export preview">{{
-        exportPreview
-      }}</pre>
-      <div class="modal-actions">
-        <button class="cancel" @click="exportPreview = ''">Close</button>
-        <button class="copy-export" @click="copyExport">
+      <p class="font-mono text-[10px] font-medium tracking-[.1em] text-[#8d918b]">
+        MARKDOWN EXPORT
+      </p>
+      <pre
+        id="export-title"
+        class="mt-4 block max-h-[min(72vh,820px)] w-full overflow-auto rounded-md border border-[#3b3f3d] bg-[#111315] p-[13px] font-mono text-[12px] leading-[1.55] text-[#d9dbd5] whitespace-pre"
+        aria-label="Markdown export preview"
+        >{{ exportPreview }}</pre>
+      <div class="mt-6 flex justify-end gap-[9px]">
+        <button
+          class="cursor-pointer rounded-md border border-[#4a4d4b] bg-transparent px-3 py-[9px] text-[12px] text-[#d1d3ce]"
+          @click="exportPreview = ''"
+        >
+          Close
+        </button>
+        <button
+          class="cursor-pointer rounded-md border border-[#527b92] bg-[#243943] px-3 py-[9px] text-[12px] font-bold text-[#d7edf5]"
+          @click="copyExport"
+        >
           {{ copiedExport ? "Copied" : "Copy" }}
         </button>
-        <button class="confirm-delete" @click="saveExport">Save file</button>
+        <button
+          class="cursor-pointer rounded-md border border-[#e07152] bg-[#c9583b] px-3 py-[9px] text-[12px] font-bold text-white"
+          @click="saveExport"
+        >
+          Save file
+        </button>
       </div>
     </section>
   </div>
-  <div v-if="importModalOpen" class="modal-backdrop" @click.self="importModalOpen = false">
+  <div
+    v-if="importModalOpen"
+    class="fixed inset-0 z-20 grid place-items-center bg-[#040505bd] p-5 backdrop-blur-[3px]"
+    @click.self="importModalOpen = false"
+  >
     <section
-      class="modal import-modal"
+      class="w-[min(94vw,1000px)] rounded-[9px] border border-[#4a4d4b] bg-[#202325] p-[25px] shadow-[0_18px_55px_#0008]"
       role="dialog"
       aria-modal="true"
       aria-labelledby="import-title"
     >
-      <p id="import-title" class="eyebrow">MARKDOWN IMPORT</p>
+      <p id="import-title" class="font-mono text-[10px] font-medium tracking-[.1em] text-[#8d918b]">
+        MARKDOWN IMPORT
+      </p>
       <textarea
         v-model="importPreview"
-        class="import-preview"
+        class="mt-4 block h-[min(58vh,650px)] w-full resize-none rounded-md border border-[#3b3f3d] bg-[#111315] p-[13px] font-mono text-[12px] leading-[1.55] text-[#d9dbd5]"
         aria-label="Markdown import content"
         placeholder="Paste your sideboard Markdown here, or upload a .md file."
       ></textarea>
-      <p v-if="importError" class="import-error">{{ importError }}</p>
-      <div class="modal-actions">
-        <button class="cancel" @click="importModalOpen = false">Close</button>
-        <button class="copy-export" @click="fileInput?.click()">Upload file</button>
-        <button class="confirm-delete" :disabled="loading" @click="applyMarkdownImport">
+      <p v-if="importError" class="mb-0 mt-[10px] text-[13px] leading-[1.55] text-[#ed9073]">
+        {{ importError }}
+      </p>
+      <div class="mt-6 flex justify-end gap-[9px]">
+        <button
+          class="cursor-pointer rounded-md border border-[#4a4d4b] bg-transparent px-3 py-[9px] text-[12px] text-[#d1d3ce]"
+          @click="importModalOpen = false"
+        >
+          Close
+        </button>
+        <button
+          class="cursor-pointer rounded-md border border-[#527b92] bg-[#243943] px-3 py-[9px] text-[12px] font-bold text-[#d7edf5]"
+          @click="fileInput?.click()"
+        >
+          Upload file
+        </button>
+        <button
+          class="cursor-pointer rounded-md border border-[#e07152] bg-[#c9583b] px-3 py-[9px] text-[12px] font-bold text-white disabled:opacity-50"
+          :disabled="loading"
+          @click="applyMarkdownImport"
+        >
           {{ loading ? "Importing…" : "Import" }}
         </button>
       </div>

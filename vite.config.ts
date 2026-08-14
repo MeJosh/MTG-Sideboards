@@ -1,6 +1,7 @@
 import { Impit } from "impit";
 import { defineConfig, type Plugin } from "vite";
 import vue from "@vitejs/plugin-vue";
+import tailwindcss from "@tailwindcss/vite";
 
 function moxfieldImporter(): Plugin {
   return {
@@ -34,5 +35,5 @@ function moxfieldImporter(): Plugin {
 
 export default defineConfig({
   base: "/MTG-Sideboards/",
-  plugins: [vue(), moxfieldImporter()],
+  plugins: [vue(), tailwindcss(), moxfieldImporter()],
 });
