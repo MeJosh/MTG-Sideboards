@@ -132,13 +132,29 @@ function saveExport() {
   markdown.save(markdown.exportFilename(deckName.value), exportPreview.value);
 }
 
+async function copyText(value: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "");
+  textarea.style.cssText = "position:fixed;opacity:0;pointer-events:none";
+  document.body.append(textarea);
+  textarea.select();
+  const copied = document.execCommand("copy");
+  textarea.remove();
+  if (!copied) throw new Error("Your browser could not copy this text.");
+}
+
 async function copyExport() {
-  await navigator.clipboard.writeText(exportPreview.value);
+  await copyText(exportPreview.value);
   copiedExport.value = true;
 }
 
 async function copyShare() {
-  await navigator.clipboard.writeText(shareUrl.value);
+  await copyText(shareUrl.value);
   copiedShare.value = true;
 }
 
