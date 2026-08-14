@@ -5,6 +5,9 @@ defineProps<{
   pendingDeletion: Plan | null;
   exportPreview: string;
   copiedExport: boolean;
+  shareUrl: string;
+  copiedShare: boolean;
+  shareError: string;
   importOpen: boolean;
   importPreview: string;
   importError: string;
@@ -17,6 +20,7 @@ defineEmits<{
   confirmDelete: [];
   closeExport: [];
   copyExport: [];
+  copyShare: [];
   saveExport: [];
   closeImport: [];
   "update:importPreview": [value: string];
@@ -117,9 +121,32 @@ defineEmits<{
       <p class="font-mono text-[10px] font-medium tracking-[.1em] text-[#8d918b]">
         MARKDOWN EXPORT
       </p>
+      <div v-if="shareUrl" class="mt-4">
+        <label for="share-url" class="block text-[12px] font-medium text-[#d9dbd5]"
+          >Share link</label
+        >
+        <div class="mt-2 flex gap-2">
+          <code
+            id="share-url"
+            class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap rounded-md border border-[#3b3f3d] bg-[#111315] px-[13px] py-[9px] font-mono text-[11px] text-[#d9dbd5]"
+            aria-label="Shareable sideboard plan URL"
+            >{{ shareUrl }}</code
+          >
+          <button
+            class="shrink-0 cursor-pointer rounded-md border border-[#527b92] bg-[#243943] px-3 py-[9px] text-[12px] font-bold text-[#d7edf5]"
+            @click="$emit('copyShare')"
+          >
+            {{ copiedShare ? "Copied" : "Copy link" }}
+          </button>
+        </div>
+        <p class="mb-0 mt-2 text-[11px] leading-[1.45] text-[#8d918b]">
+          Includes a decklist backup and all matchup changes in a compact URL.
+        </p>
+      </div>
+      <p v-else-if="shareError" class="mb-0 mt-4 text-[12px] text-[#aaada8]">{{ shareError }}</p>
       <pre
         id="export-title"
-        class="mt-4 block max-h-[min(72vh,820px)] w-full overflow-auto rounded-md border border-[#3b3f3d] bg-[#111315] p-[13px] font-mono text-[12px] leading-[1.55] text-[#d9dbd5] whitespace-pre"
+        class="mt-4 block max-h-[min(60vh,720px)] w-full overflow-auto rounded-md border border-[#3b3f3d] bg-[#111315] p-[13px] font-mono text-[12px] leading-[1.55] text-[#d9dbd5] whitespace-pre"
         aria-label="Markdown export preview"
         >{{ exportPreview }}</pre>
       <div class="mt-6 flex justify-end gap-[9px]">
@@ -162,7 +189,7 @@ defineEmits<{
         class="mt-4 block h-[min(58vh,650px)] w-full resize-none rounded-md border border-[#3b3f3d] bg-[#111315] p-[13px] font-mono text-[12px] leading-[1.55] text-[#d9dbd5]"
         :value="importPreview"
         aria-label="Markdown import content"
-        placeholder="Paste your sideboard Markdown here, or upload a .md file."
+        placeholder="Paste matchup Markdown here, or upload a .md file."
         @input="$emit('update:importPreview', ($event.target as HTMLTextAreaElement).value)"
       />
       <p v-if="importError" class="mb-0 mt-[10px] text-[13px] leading-[1.55] text-[#ed9073]">

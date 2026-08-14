@@ -36,15 +36,16 @@ export function useMarkdownPlans(
     deckSourceUrl: string,
   ) {
     const frontmatter = /^---\s*\n([\s\S]*?)\n---/.exec(markdown)?.[1];
-    if (!frontmatter) throw new Error("This file needs YAML frontmatter.");
     let sourceUrl = "";
-    for (const line of frontmatter.split(/\r?\n/)) {
-      const source = /^source:\s*(.+)$/.exec(line)?.[1];
-      if (source) {
-        try {
-          sourceUrl = JSON.parse(source);
-        } catch {
-          sourceUrl = source.trim();
+    if (frontmatter) {
+      for (const line of frontmatter.split(/\r?\n/)) {
+        const source = /^source:\s*(.+)$/.exec(line)?.[1];
+        if (source) {
+          try {
+            sourceUrl = JSON.parse(source);
+          } catch {
+            sourceUrl = source.trim();
+          }
         }
       }
     }

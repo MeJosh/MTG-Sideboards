@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import DeckBreadcrumb from "./components/DeckBreadcrumb.vue";
 import DeckPile from "./components/DeckPile.vue";
 import DeckSidebar from "./components/DeckSidebar.vue";
@@ -7,6 +7,7 @@ import PlannerModals from "./components/PlannerModals.vue";
 import SideboardGuide from "./components/SideboardGuide.vue";
 import { useDeckImport } from "./composables/useDeckImport";
 import { useMarkdownPlans } from "./composables/useMarkdownPlans";
+import { useSharePlans } from "./composables/useSharePlans";
 import { useSideboardPlanner } from "./composables/useSideboardPlanner";
 import { cardIdentity, type Plan } from "./types";
 
@@ -15,6 +16,9 @@ const deckText = ref("");
 const pendingDeletion = ref<Plan | null>(null);
 const exportPreview = ref("");
 const copiedExport = ref(false);
+const shareUrl = ref("");
+const copiedShare = ref(false);
+const shareError = ref("");
 const importModalOpen = ref(false);
 const importPreview = ref("");
 const importError = ref("");
@@ -44,6 +48,7 @@ const {
 } = planner;
 const { fetchMoxfieldDeck, parseDeckText: parseDecklist, loadArt } = useDeckImport(plans);
 const markdown = useMarkdownPlans(fetchMoxfieldDeck, copyCards);
+const sharing = useSharePlans(copyCards);
 const hasMultiplePrintings = computed(() => {
   if (!selected.value) return false;
   const printingsByName = new Map<string, Set<string>>();
@@ -99,7 +104,7 @@ function deleteMatchup() {
   pendingDeletion.value = null;
 }
 
-function openExportPreview() {
+async function openExportPreview() {
   if (!base.value) return;
   exportPreview.value = markdown.createExport(
     deckName.value,
@@ -108,6 +113,19 @@ function openExportPreview() {
     changesFor,
   );
   copiedExport.value = false;
+  copiedShare.value = false;
+  shareError.value = "";
+  try {
+    shareUrl.value = await sharing.createShareUrl(
+      deckName.value,
+      deckSourceUrl.value,
+      plans.value,
+      changesFor,
+    );
+  } catch (cause) {
+    shareUrl.value = "";
+    shareError.value = cause instanceof Error ? cause.message : "Could not create a share link.";
+  }
 }
 
 function saveExport() {
@@ -117,6 +135,11 @@ function saveExport() {
 async function copyExport() {
   await navigator.clipboard.writeText(exportPreview.value);
   copiedExport.value = true;
+}
+
+async function copyShare() {
+  await navigator.clipboard.writeText(shareUrl.value);
+  copiedShare.value = true;
 }
 
 function openImportModal() {
@@ -172,9 +195,51 @@ async function applyMarkdownImport() {
   }
 }
 
-onMounted(() => {
+function closeOnEscape(event: KeyboardEvent) {
+  if (event.key !== "Escape") return;
+  if (importModalOpen.value) importModalOpen.value = false;
+  if (exportPreview.value) {
+    exportPreview.value = "";
+    shareUrl.value = "";
+    shareError.value = "";
+  }
+}
+
+onMounted(async () => {
+  window.addEventListener("keydown", closeOnEscape);
   restore();
   const url = new URL(window.location.href);
+  const sharedPlan = url.searchParams.get("plan");
+  if (sharedPlan) {
+    url.searchParams.delete("plan");
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${url.pathname}${url.search}${url.hash}`,
+    );
+    loading.value = true;
+    error.value = "";
+    try {
+      const shared = await sharing.decodeShare(sharedPlan);
+      let imported;
+      try {
+        imported = shared.sourceUrl ? await fetchMoxfieldDeck(shared.sourceUrl) : undefined;
+      } catch {
+        imported = undefined;
+      }
+      const importedPlan = imported?.plan ?? sharing.baseFromShare(shared);
+      deckName.value = shared.deckName || imported?.name || "Shared deck";
+      deckSourceUrl.value = imported?.sourceUrl ?? shared.sourceUrl;
+      plans.value = sharing.plansFromShare(shared, importedPlan);
+      selectedId.value = "base";
+      await loadArt();
+    } catch (cause) {
+      error.value = cause instanceof Error ? cause.message : "Could not open this share link.";
+    } finally {
+      loading.value = false;
+    }
+    return;
+  }
   const sharedDeckUrl = url.searchParams.get("moxfield");
   if (!sharedDeckUrl) return;
   url.searchParams.delete("moxfield");
@@ -182,6 +247,8 @@ onMounted(() => {
   deckUrl.value = sharedDeckUrl;
   void importMoxfieldDeck(sharedDeckUrl);
 });
+
+onBeforeUnmount(() => window.removeEventListener("keydown", closeOnEscape));
 
 watch(gregMode, (enabled) => localStorage.setItem(GREG_MODE_KEY, String(enabled)));
 </script>
@@ -276,6 +343,9 @@ watch(gregMode, (enabled) => localStorage.setItem(GREG_MODE_KEY, String(enabled)
     :pending-deletion="pendingDeletion"
     :export-preview="exportPreview"
     :copied-export="copiedExport"
+    :share-url="shareUrl"
+    :copied-share="copiedShare"
+    :share-error="shareError"
     :import-open="importModalOpen"
     :import-preview="importPreview"
     :import-error="importError"
@@ -283,8 +353,13 @@ watch(gregMode, (enabled) => localStorage.setItem(GREG_MODE_KEY, String(enabled)
     :loading="loading"
     @close-delete="pendingDeletion = null"
     @confirm-delete="deleteMatchup"
-    @close-export="exportPreview = ''"
+    @close-export="
+      exportPreview = '';
+      shareUrl = '';
+      shareError = '';
+    "
     @copy-export="copyExport"
+    @copy-share="copyShare"
     @save-export="saveExport"
     @close-import="importModalOpen = false"
     @update:import-preview="importPreview = $event"
