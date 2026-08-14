@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+
+commit_message=$(head -n 1 "$1")
+conventional_commit='^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-z0-9][a-z0-9._/-]*\))?!?: .+'
+
+if ! printf '%s\n' "$commit_message" | grep -Eq "$conventional_commit"; then
+  echo "Invalid commit message: $commit_message"
+  echo "Use Conventional Commits, for example: feat(sideboard): add matchup export"
+  exit 1
+fi
