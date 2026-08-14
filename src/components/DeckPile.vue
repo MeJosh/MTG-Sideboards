@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import type { Card } from "../types";
+import { cardIdentity, type Card } from "../types";
 
 defineProps<{
   title: string;
   cards: Card[];
   total: number;
   disabled: boolean;
-  movedNames?: string[];
+  movedKeys?: string[];
   movedClass?: string;
 }>();
 
@@ -22,13 +22,13 @@ defineEmits<{ move: [card: Card] }>();
     <div class="grid grid-cols-2 gap-[11px] sm:grid-cols-[repeat(auto-fill,minmax(138px,1fr))]">
       <button
         v-for="card in cards"
-        :key="card.name"
+        :key="cardIdentity(card)"
         :class="[
           'relative min-w-0 overflow-hidden rounded-[7px] border border-[#343739] bg-[#202325] p-0 text-left text-[#e8e7e0] transition duration-150 enabled:cursor-pointer enabled:hover:-translate-y-[3px] enabled:hover:border-[#df7548] disabled:cursor-default',
-          movedNames?.includes(card.name) &&
+          movedKeys?.includes(cardIdentity(card)) &&
             movedClass === 'brought-in' &&
             'border-[#6fba77] shadow-[0_0_0_1px_#6fba7740,0_0_15px_#6fba7720]',
-          movedNames?.includes(card.name) &&
+          movedKeys?.includes(cardIdentity(card)) &&
             movedClass === 'moved-out' &&
             'border-[#d46a61] shadow-[0_0_0_1px_#d46a6140,0_0_15px_#d46a6120]',
         ]"

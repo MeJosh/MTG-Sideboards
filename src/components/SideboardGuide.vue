@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Card } from "../types";
+import { cardIdentity, type Card } from "../types";
 
 defineProps<{
   title: string;
@@ -22,7 +22,7 @@ defineProps<{
       <div class="min-w-0">
         <p
           v-for="card in removals"
-          :key="`out-${card.name}`"
+          :key="`out-${cardIdentity(card)}`"
           class="my-[3px] font-mono text-[13px] text-[#e9ad94]"
         >
           −{{ card.quantity }} {{ card.name }}
@@ -31,7 +31,7 @@ defineProps<{
       <div class="min-w-0">
         <p
           v-for="card in additions"
-          :key="`in-${card.name}`"
+          :key="`in-${cardIdentity(card)}`"
           class="my-[3px] font-mono text-[13px] text-[#a6cf9f]"
         >
           +{{ card.quantity }} {{ card.name }}
